@@ -1,15 +1,29 @@
 --[[
     ================================================================
-      RscriptsX v5.0 — Rivals Edition
+      RscriptsX v5.0 — Rivals Edition (Xeno Compatible)
       Key: ErogareVIP
       ESP - Aimbot - Silent Aim - Wallbang - Ragebot - Misc
-      Complete ground-up rewrite
+      Complete ground-up rewrite with compatibility fixes
     ================================================================
 --]]
 
----------------------------------------------------------------
--- SECTION 1: SERVICES
----------------------------------------------------------------
+-- ========== COMPATIBILITY LAYER ==========
+local function safe()
+    local ok, err = xpcall(function() return end, function(e) return e end)
+    return not err
+end
+
+local function warn(...)
+    print("[RscriptsX]", ...)
+end
+
+-- Fallback for task library
+local taskLib = task or {}
+taskLib.wait = taskLib.wait or wait
+taskLib.delay = taskLib.delay or delay
+taskLib.spawn = taskLib.spawn or spawn
+
+-- ========== SERVICES ==========
 local Players      = game:GetService("Players")
 local RunService   = game:GetService("RunService")
 local UIS          = game:GetService("UserInputService")
@@ -19,9 +33,7 @@ local Camera       = workspace.CurrentCamera
 local LP           = Players.LocalPlayer
 local Mouse        = LP:GetMouse()
 
----------------------------------------------------------------
--- SECTION 2: EXECUTOR COMPATIBILITY
----------------------------------------------------------------
+-- ========== EXECUTOR COMPATIBILITY ==========
 local EXEC = {}
 EXEC.mmr = (typeof(mousemoverel) == "function") and mousemoverel or nil
 EXEC.m1c = (typeof(mouse1click) == "function") and mouse1click or nil
@@ -34,17 +46,24 @@ EXEC.gnm = (typeof(getnamecallmethod) == "function") and getnamecallmethod or ni
 EXEC.hkf = (typeof(hookfunction) == "function") and hookfunction or nil
 EXEC.cc  = (typeof(checkcaller) == "function") and checkcaller or nil
 
+-- Check drawing support
+local drawingSupported = pcall(function() 
+    local d = Drawing.new("Text")
+    d:Remove()
+end)
+
+if not drawingSupported then
+    warn("Drawing library not supported – ESP and FOV circles will be disabled")
+end
+
 local function wrapCC(fn)
     if EXEC.ncc then return EXEC.ncc(fn) end
     return fn
 end
 
--- Self-call guard for hooks (when checkcaller unavailable)
 local _selfCall = false
 
----------------------------------------------------------------
--- SECTION 3: CONFIGURATION
----------------------------------------------------------------
+-- ========== CONFIGURATION ==========
 local CFG = {
     ESP = {
         On = false,
@@ -111,9 +130,7 @@ local CFG = {
     },
 }
 
----------------------------------------------------------------
--- SECTION 4: THEME
----------------------------------------------------------------
+-- ========== THEME ==========
 local TH = {
     bg       = Color3.fromRGB(10, 10, 16),
     bg2      = Color3.fromRGB(16, 17, 24),
@@ -133,9 +150,7 @@ local TH = {
     sideAct  = Color3.fromRGB(26, 28, 40),
 }
 
----------------------------------------------------------------
--- SECTION 5: HELPER FUNCTIONS
----------------------------------------------------------------
+-- ========== HELPER FUNCTIONS ==========
 local function cr(radius, parent)
     local c = Instance.new("UICorner", parent)
     c.CornerRadius = UDim.new(0, radius)
@@ -170,9 +185,7 @@ local function addGradient(parent, c1, c2)
     return g
 end
 
----------------------------------------------------------------
--- SECTION 6: CORE UTILITY (targeting, visibility, etc.)
----------------------------------------------------------------
+-- ========== CORE UTILITY ==========
 local silentTarget = nil
 
 local function sameTeam(player)
@@ -244,9 +257,7 @@ local function getClosest(fov, partName, teamCheck, visCheck, priority)
     return best
 end
 
----------------------------------------------------------------
--- SECTION 7: WALLBANG ENGINE
----------------------------------------------------------------
+-- ========== WALLBANG ENGINE ==========
 local wbParts = {}
 local wbConn = nil
 
@@ -271,7 +282,7 @@ function enableWB()
         end
     end
     wbConn = workspace.DescendantAdded:Connect(function(v)
-        task.wait()
+        taskLib.wait()
         if v:IsA("BasePart") and not isCharacterPart(v) then
             pcall(function()
                 v.CanQuery = false
@@ -291,9 +302,7 @@ function disableWB()
     wbParts = {}
 end
 
----------------------------------------------------------------
--- SECTION 8: FLY ENGINE
----------------------------------------------------------------
+-- ========== FLY ENGINE ==========
 local flyBV, flyBG = nil, nil
 
 function enableFly()
@@ -321,9 +330,7 @@ function disableFly()
     if hm then hm.PlatformStand = false end
 end
 
----------------------------------------------------------------
--- SECTION 9: KEY SYSTEM GUI
----------------------------------------------------------------
+-- ========== KEY SYSTEM GUI ==========
 local VALID_KEY = "ErogareVIP"
 local keyOK = false
 
@@ -331,8 +338,14 @@ local KGui = Instance.new("ScreenGui")
 KGui.Name = "RscriptsX_Key"
 KGui.ResetOnSpawn = false
 KGui.DisplayOrder = 1001
-pcall(function() KGui.Parent = game:GetService("CoreGui") end)
-if not KGui.Parent or not KGui.Parent:IsA("CoreGui") then
+
+-- Try to put in CoreGui, fallback to PlayerGui
+local success, target = pcall(function() 
+    return game:GetService("CoreGui") 
+end)
+if success and target then
+    KGui.Parent = target
+else
     KGui.Parent = LP:WaitForChild("PlayerGui")
 end
 
@@ -474,10 +487,10 @@ local function tryKey()
         keyStatus.TextColor3 = TH.green
         keyStatus.Text = "Key accepted — loading..."
         tw(keyBtn, 0.2, { BackgroundColor3 = TH.green })
-        task.wait(0.6)
+        taskLib.wait(0.6)
         tw(keyCard, 0.3, { Position = UDim2.new(0.5, -200, 0.5, -200), BackgroundTransparency = 1 })
         tw(overlay, 0.3, { BackgroundTransparency = 1 })
-        task.wait(0.35)
+        taskLib.wait(0.35)
         KGui:Destroy()
     else
         keyStatus.TextColor3 = TH.red
@@ -486,9 +499,9 @@ local function tryKey()
         local orig = keyCard.Position
         for i = 1, 3 do
             tw(keyCard, 0.04, { Position = UDim2.new(orig.X.Scale, orig.X.Offset + 8, orig.Y.Scale, orig.Y.Offset) })
-            task.wait(0.04)
+            taskLib.wait(0.04)
             tw(keyCard, 0.04, { Position = UDim2.new(orig.X.Scale, orig.X.Offset - 8, orig.Y.Scale, orig.Y.Offset) })
-            task.wait(0.04)
+            taskLib.wait(0.04)
         end
         tw(keyCard, 0.04, { Position = orig })
     end
@@ -500,19 +513,21 @@ keyInput.FocusLost:Connect(function(enterPressed)
 end)
 
 -- Wait for key
-repeat task.wait() until keyOK
+repeat taskLib.wait() until keyOK
 
----------------------------------------------------------------
--- SECTION 10: MAIN GUI SHELL
----------------------------------------------------------------
+-- ========== MAIN GUI SHELL ==========
 local GUI = Instance.new("ScreenGui")
 GUI.Name = "RscriptsX"
 GUI.ResetOnSpawn = false
 GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 GUI.DisplayOrder = 999
 pcall(function() GUI.IgnoreGuiInset = true end)
-pcall(function() GUI.Parent = game:GetService("CoreGui") end)
-if not GUI.Parent or not GUI.Parent:IsA("CoreGui") then
+
+-- Try CoreGui first, fallback to PlayerGui
+local success2, target2 = pcall(function() return game:GetService("CoreGui") end)
+if success2 and target2 then
+    GUI.Parent = target2
+else
     GUI.Parent = LP:WaitForChild("PlayerGui")
 end
 
@@ -532,16 +547,13 @@ local Win = mk("Frame", {
 cr(12, Win)
 addStroke(Win, TH.border, 1)
 
----------------------------------------------------------------
 -- HEADER
----------------------------------------------------------------
 local Header = mk("Frame", {
     Size = UDim2.new(1, 0, 0, HEADER_H),
     BackgroundColor3 = TH.bg2,
     ZIndex = 5,
 }, Win)
 cr(12, Header)
--- Cover bottom rounded corners
 mk("Frame", {
     Size = UDim2.new(1, 0, 0, 14),
     Position = UDim2.new(0, 0, 1, -14),
@@ -549,7 +561,6 @@ mk("Frame", {
     ZIndex = 5,
 }, Header)
 
--- Gradient accent line
 local accentBar = mk("Frame", {
     Size = UDim2.new(1, -20, 0, 2),
     Position = UDim2.new(0, 10, 1, -2),
@@ -559,7 +570,6 @@ local accentBar = mk("Frame", {
 cr(2, accentBar)
 addGradient(accentBar, TH.accent, TH.accent2)
 
--- Logo dot
 local logoDot = mk("Frame", {
     Size = UDim2.new(0, 10, 0, 10),
     Position = UDim2.new(0, 16, 0.5, -5),
@@ -568,17 +578,15 @@ local logoDot = mk("Frame", {
 }, Header)
 cr(5, logoDot)
 
--- Pulsing glow on dot
-task.spawn(function()
+taskLib.spawn(function()
     while Win and Win.Parent do
         tw(logoDot, 1.2, { BackgroundTransparency = 0.5 })
-        task.wait(1.2)
+        taskLib.wait(1.2)
         tw(logoDot, 1.2, { BackgroundTransparency = 0 })
-        task.wait(1.2)
+        taskLib.wait(1.2)
     end
 end)
 
--- Title
 mk("TextLabel", {
     BackgroundTransparency = 1,
     Text = "RscriptsX",
@@ -665,9 +673,7 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
----------------------------------------------------------------
 -- SIDEBAR
----------------------------------------------------------------
 local SidebarFrame = mk("Frame", {
     Size = UDim2.new(0, SIDEBAR_W, 1, -(HEADER_H + FOOTER_H)),
     Position = UDim2.new(0, 0, 0, HEADER_H),
@@ -675,7 +681,6 @@ local SidebarFrame = mk("Frame", {
     ClipsDescendants = true,
 }, Win)
 
--- Sidebar divider line
 mk("Frame", {
     Size = UDim2.new(0, 1, 1, 0),
     Position = UDim2.new(1, 0, 0, 0),
@@ -688,9 +693,7 @@ sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 Instance.new("UIPadding", SidebarFrame).PaddingTop = UDim.new(0, 6)
 
----------------------------------------------------------------
 -- CONTENT AREA
----------------------------------------------------------------
 local ContentFrame = mk("Frame", {
     Size = UDim2.new(1, -(SIDEBAR_W + 2), 1, -(HEADER_H + FOOTER_H)),
     Position = UDim2.new(0, SIDEBAR_W + 2, 0, HEADER_H),
@@ -698,12 +701,10 @@ local ContentFrame = mk("Frame", {
     ClipsDescendants = true,
 }, Win)
 
----------------------------------------------------------------
--- FOOTER (status bar)
----------------------------------------------------------------
+-- FOOTER
 local Footer = mk("Frame", {
     Size = UDim2.new(1, 0, 0, FOOTER_H),
-    Position = UDim2.new(0, 0, 1, -FOOTER_H),
+    Position = UDim2.new(0, 0, 0, 1, -FOOTER_H),
     BackgroundColor3 = TH.bg2,
 }, Win)
 cr(12, Footer)
@@ -735,14 +736,11 @@ local footerTarget = mk("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Right,
 }, Footer)
 
----------------------------------------------------------------
--- SECTION 11: TAB SYSTEM
----------------------------------------------------------------
+-- ========== TAB SYSTEM ==========
 local tabs = {}
 local activeTab = nil
 
 local function createTab(label, icon, order)
-    -- Sidebar button
     local btn = mk("TextButton", {
         Size = UDim2.new(1, -8, 0, 34),
         BackgroundColor3 = TH.sidebar,
@@ -753,7 +751,6 @@ local function createTab(label, icon, order)
     }, SidebarFrame)
     cr(8, btn)
 
-    -- Active indicator (left bar)
     local indicator = mk("Frame", {
         Size = UDim2.new(0, 3, 0, 0),
         Position = UDim2.new(0, 4, 0.5, 0),
@@ -762,7 +759,6 @@ local function createTab(label, icon, order)
     }, btn)
     cr(2, indicator)
 
-    -- Icon placeholder
     local iconLabel = mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = icon or "",
@@ -774,7 +770,6 @@ local function createTab(label, icon, order)
         TextXAlignment = Enum.TextXAlignment.Center,
     }, btn)
 
-    -- Label
     local labelText = mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = label,
@@ -786,7 +781,6 @@ local function createTab(label, icon, order)
         TextXAlignment = Enum.TextXAlignment.Left,
     }, btn)
 
-    -- Content scroll frame
     local scroll = Instance.new("ScrollingFrame", ContentFrame)
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
@@ -818,7 +812,6 @@ local function createTab(label, icon, order)
     }
     tabs[label] = tab
 
-    -- Click to switch
     btn.MouseButton1Click:Connect(function()
         if activeTab then
             activeTab.scroll.Visible = false
@@ -835,7 +828,6 @@ local function createTab(label, icon, order)
         tw(labelText, 0.15, { TextColor3 = TH.text })
     end)
 
-    -- Hover
     btn.MouseEnter:Connect(function()
         if activeTab ~= tab then
             tw(btn, 0.08, { BackgroundColor3 = TH.sideHov })
@@ -850,9 +842,7 @@ local function createTab(label, icon, order)
     return tab
 end
 
----------------------------------------------------------------
--- SECTION 12: GUI COMPONENTS
----------------------------------------------------------------
+-- ========== GUI COMPONENTS ==========
 local function Section(tab, text)
     tab.n += 1
     local container = mk("Frame", {
@@ -861,14 +851,12 @@ local function Section(tab, text)
         LayoutOrder = tab.n,
     }, tab.scroll)
 
-    -- Line
     mk("Frame", {
         Size = UDim2.new(1, 0, 0, 1),
         Position = UDim2.new(0, 0, 0.5, 0),
         BackgroundColor3 = TH.border,
     }, container)
 
-    -- Label background (to mask the line)
     local labelBG = mk("Frame", {
         Size = UDim2.new(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -897,7 +885,6 @@ local function Toggle(tab, text, default, callback)
     }, tab.scroll)
     cr(8, row)
 
-    -- Label
     mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = text,
@@ -909,7 +896,6 @@ local function Toggle(tab, text, default, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
 
-    -- Track
     local track = mk("Frame", {
         Size = UDim2.new(0, 40, 0, 21),
         Position = UDim2.new(1, -52, 0.5, -10),
@@ -917,7 +903,6 @@ local function Toggle(tab, text, default, callback)
     }, row)
     cr(10, track)
 
-    -- Knob
     local knob = mk("Frame", {
         Size = UDim2.new(0, 15, 0, 15),
         Position = default and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 3, 0.5, -7),
@@ -925,13 +910,11 @@ local function Toggle(tab, text, default, callback)
     }, track)
     cr(7, knob)
 
-    -- Knob shadow
     local knobStroke = addStroke(knob, Color3.fromRGB(0, 0, 0), 0.5)
     knobStroke.Transparency = 0.8
 
     local value = default or false
 
-    -- Click area
     local clickArea = mk("TextButton", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
@@ -959,7 +942,6 @@ local function Slider(tab, text, min, max, default, suffix, callback)
     }, tab.scroll)
     cr(8, row)
 
-    -- Label
     mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = text,
@@ -971,7 +953,6 @@ local function Slider(tab, text, min, max, default, suffix, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
 
-    -- Value display
     local valLabel = mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = tostring(default) .. (suffix or ""),
@@ -983,7 +964,6 @@ local function Slider(tab, text, min, max, default, suffix, callback)
         TextXAlignment = Enum.TextXAlignment.Right,
     }, row)
 
-    -- Track background
     local track = mk("Frame", {
         Size = UDim2.new(1, -28, 0, 6),
         Position = UDim2.new(0, 14, 0, 38),
@@ -991,7 +971,6 @@ local function Slider(tab, text, min, max, default, suffix, callback)
     }, row)
     cr(3, track)
 
-    -- Fill
     local pct = (default - min) / (max - min)
     local fill = mk("Frame", {
         Size = UDim2.new(pct, 0, 1, 0),
@@ -1000,7 +979,6 @@ local function Slider(tab, text, min, max, default, suffix, callback)
     cr(3, fill)
     addGradient(fill, TH.accent, TH.accent2)
 
-    -- Handle
     local handle = mk("Frame", {
         Size = UDim2.new(0, 14, 0, 14),
         Position = UDim2.new(pct, -7, 0.5, -7),
@@ -1061,7 +1039,6 @@ local function Dropdown(tab, text, options, default, callback)
     }, tab.scroll)
     cr(8, row)
 
-    -- Label
     mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = text,
@@ -1073,7 +1050,6 @@ local function Dropdown(tab, text, options, default, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
 
-    -- Selected text
     local selLabel = mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = default,
@@ -1085,7 +1061,6 @@ local function Dropdown(tab, text, options, default, callback)
         TextXAlignment = Enum.TextXAlignment.Right,
     }, row)
 
-    -- Arrow
     local arrow = mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = "v",
@@ -1096,7 +1071,6 @@ local function Dropdown(tab, text, options, default, callback)
         TextColor3 = TH.subtext,
     }, row)
 
-    -- Option buttons
     local optBtns = {}
     for i, opt in ipairs(options) do
         local optBtn = mk("TextButton", {
@@ -1127,7 +1101,6 @@ local function Dropdown(tab, text, options, default, callback)
         optBtn.MouseLeave:Connect(function() tw(optBtn, 0.06, { BackgroundColor3 = TH.bg3 }) end)
     end
 
-    -- Toggle open/close
     local isOpen = false
     local headerClick = mk("TextButton", {
         Size = UDim2.new(1, 0, 0, ROW_H),
@@ -1180,7 +1153,6 @@ local function InfoBox(tab, text, height)
     cr(8, row)
     addStroke(row, TH.border, 1)
 
-    -- Left accent bar
     local accent = mk("Frame", {
         Size = UDim2.new(0, 3, 1, -8),
         Position = UDim2.new(0, 4, 0, 4),
@@ -1210,7 +1182,6 @@ local function StatusRow(tab, label, ok)
     }, tab.scroll)
     cr(6, row)
 
-    -- Status dot
     mk("Frame", {
         Size = UDim2.new(0, 8, 0, 8),
         Position = UDim2.new(0, 12, 0.5, -4),
@@ -1229,9 +1200,7 @@ local function StatusRow(tab, label, ok)
     }, row)
 end
 
----------------------------------------------------------------
--- SECTION 13: NOTIFICATION SYSTEM
----------------------------------------------------------------
+-- ========== NOTIFICATION SYSTEM ==========
 local notifCount = 0
 
 local function Notify(title, text, duration, color)
@@ -1246,7 +1215,6 @@ local function Notify(title, text, duration, color)
     cr(10, n)
     addStroke(n, TH.border, 1)
 
-    -- Left color bar
     local bar = mk("Frame", {
         Size = UDim2.new(0, 3, 1, -10),
         Position = UDim2.new(0, 5, 0, 5),
@@ -1254,7 +1222,6 @@ local function Notify(title, text, duration, color)
     }, n)
     cr(2, bar)
 
-    -- Title
     mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = title,
@@ -1266,7 +1233,6 @@ local function Notify(title, text, duration, color)
         TextXAlignment = Enum.TextXAlignment.Left,
     }, n)
 
-    -- Body
     mk("TextLabel", {
         BackgroundTransparency = 1,
         Text = text,
@@ -1279,20 +1245,17 @@ local function Notify(title, text, duration, color)
         TextWrapped = true,
     }, n)
 
-    -- Animate in
     tw(n, 0.35, { Position = UDim2.new(1, -290, 1, -(idx * 68)) })
 
-    task.delay(duration or 4, function()
+    taskLib.delay(duration or 4, function()
         tw(n, 0.35, { Position = UDim2.new(1, 10, 1, -(idx * 68)) })
-        task.wait(0.4)
+        taskLib.wait(0.4)
         n:Destroy()
         notifCount -= 1
     end)
 end
 
----------------------------------------------------------------
--- SECTION 14: BUILD TABS
----------------------------------------------------------------
+-- ========== BUILD TABS ==========
 local tESP    = createTab("ESP",       "E", 1)
 local tAim    = createTab("Aimbot",    "A", 2)
 local tSilent = createTab("Silent",    "S", 3)
@@ -1309,9 +1272,7 @@ tESP.indicator.Size = UDim2.new(0, 3, 0, 18)
 tESP.iconLabel.TextColor3 = TH.accent2
 tESP.labelText.TextColor3 = TH.text
 
----------------------------------------------------------------
--- SECTION 15: TAB CONTENT — ESP
----------------------------------------------------------------
+-- ========== TAB CONTENT — ESP ==========
 Section(tESP, "VISIBILITY")
 Toggle(tESP, "Enable ESP", false, function(v) CFG.ESP.On = v end)
 Toggle(tESP, "Boxes", true, function(v) CFG.ESP.Boxes = v end)
@@ -1356,9 +1317,7 @@ end)
 Section(tESP, "FILTERS")
 Toggle(tESP, "Team Check", false, function(v) CFG.ESP.Team = v end)
 
----------------------------------------------------------------
--- TAB CONTENT — AIMBOT
----------------------------------------------------------------
+-- ========== TAB CONTENT — AIMBOT ==========
 Section(tAim, "CAMERA AIMBOT")
 Toggle(tAim, "Enable Aimbot", false, function(v) CFG.Aim.On = v end)
 Toggle(tAim, "Show FOV Circle", true, function(v) CFG.Aim.Circle = v end)
@@ -1381,9 +1340,7 @@ end)
 
 InfoBox(tAim, "Hold your selected key to lock onto the closest player in your FOV circle. Uses mousemoverel for accurate input simulation.", 50)
 
----------------------------------------------------------------
--- TAB CONTENT — SILENT AIM
----------------------------------------------------------------
+-- ========== TAB CONTENT — SILENT AIM ==========
 Section(tSilent, "SILENT AIM")
 Toggle(tSilent, "Enable Silent Aim", false, function(v) CFG.SA.On = v end)
 Toggle(tSilent, "FOV Check", true, function(v) CFG.SA.FOVCheck = v end)
@@ -1400,9 +1357,7 @@ end)
 
 InfoBox(tSilent, "TRIPLE HOOK: (1) Mouse.Hit/Target redirect (2) workspace:Raycast direction override (3) FireServer argument replacement. Works regardless of where you aim.", 60)
 
----------------------------------------------------------------
--- TAB CONTENT — WALLBANG
----------------------------------------------------------------
+-- ========== TAB CONTENT — WALLBANG ==========
 Section(tWall, "SHOOT THROUGH WALLS")
 Toggle(tWall, "Enable Wallbang", false, function(v)
     CFG.WB.On = v
@@ -1420,9 +1375,7 @@ end)
 InfoBox(tWall, "Sets CanQuery=false on all non-character parts. Client raycasts pass through walls. Combined with Silent Aim, your bullets reach targets behind walls.", 56)
 InfoBox(tWall, "For server-authoritative games like Rivals, wallbang works BEST with Silent Aim enabled — the raycast redirect ensures the server registers the hit.", 56)
 
----------------------------------------------------------------
--- TAB CONTENT — RAGEBOT
----------------------------------------------------------------
+-- ========== TAB CONTENT — RAGEBOT ==========
 Section(tRage, "RAGEBOT")
 Toggle(tRage, "Enable Ragebot", false, function(v)
     CFG.Rage.On = v
@@ -1442,9 +1395,7 @@ end)
 InfoBox(tRage, "Ragebot = 0 smoothing + no FOV limit + auto-fire + forced silent aim. Overrides regular aimbot when enabled.", 50)
 InfoBox(tRage, "Anti-Aim spins your character model rapidly to desync your hitbox, making you harder to hit.", 44)
 
----------------------------------------------------------------
--- TAB CONTENT — MISC
----------------------------------------------------------------
+-- ========== TAB CONTENT — MISC ==========
 Section(tMisc, "MOVEMENT")
 Toggle(tMisc, "Infinite Jump", false, function(v) CFG.Misc.InfJump = v end)
 Toggle(tMisc, "Noclip", false, function(v) CFG.Misc.Noclip = v end)
@@ -1509,9 +1460,7 @@ Button(tMisc, "Copy Username", TH.accent, function()
     Notify("Copied", LP.Name, 2, TH.green)
 end)
 
----------------------------------------------------------------
--- TAB CONTENT — STATUS
----------------------------------------------------------------
+-- ========== TAB CONTENT — STATUS ==========
 Section(tStatus, "EXECUTOR FEATURES")
 StatusRow(tStatus, "mousemoverel — Aimbot", EXEC.mmr ~= nil)
 StatusRow(tStatus, "getrawmetatable — Silent Aim Hook 1", EXEC.grm ~= nil)
@@ -1520,6 +1469,7 @@ StatusRow(tStatus, "newcclosure — Hook wrapper", EXEC.ncc ~= nil)
 StatusRow(tStatus, "getnamecallmethod — Namecall hook", EXEC.gnm ~= nil)
 StatusRow(tStatus, "checkcaller — Self-call guard", EXEC.cc ~= nil)
 StatusRow(tStatus, "mouse1click — Auto-fire", EXEC.m1c ~= nil)
+StatusRow(tStatus, "Drawing Library", drawingSupported)
 
 Section(tStatus, "HOOK STATUS")
 -- These get updated after hooks are installed (see below)
@@ -1528,16 +1478,12 @@ Section(tStatus, "KEY")
 InfoBox(tStatus, "Key: ErogareVIP   |   Status: Authenticated", 32)
 
 Section(tStatus, "INFO")
-InfoBox(tStatus, "RscriptsX v5.0 — Rivals Edition | Ground-up rewrite", 32)
+InfoBox(tStatus, "RscriptsX v5.0 — Rivals Edition | Xeno compatible", 32)
 InfoBox(tStatus, "Silent Aim: Triple hook (Mouse + Raycast + FireServer)", 32)
 InfoBox(tStatus, "Aimbot: mousemoverel with sensitivity calibration", 32)
 
----------------------------------------------------------------
--- SECTION 16: ESP ENGINE
----------------------------------------------------------------
+-- ========== ESP ENGINE (with drawing fallback) ==========
 local espPool = {}
-
--- Skeleton connections for R15 and R6
 local SKEL_R15 = {
     {"Head", "UpperTorso"},
     {"UpperTorso", "LowerTorso"},
@@ -1563,501 +1509,463 @@ local SKEL_R6 = {
     {"Torso", "Right Leg"},
 }
 
-local function createESPObject(player)
-    if player == LP then return end
-    local D = Drawing.new
+if drawingSupported then
+    local function createESPObject(player)
+        if player == LP then return end
+        local D = Drawing.new
 
-    local e = {}
+        local e = {}
+        e.box = D("Square")
+        e.box.Filled = false
+        e.box.Thickness = 1.4
+        e.box.Visible = false
 
-    -- Box (normal)
-    e.box = D("Square")
-    e.box.Filled = false
-    e.box.Thickness = 1.4
-    e.box.Visible = false
+        e.boxOutline = D("Square")
+        e.boxOutline.Filled = false
+        e.boxOutline.Thickness = 3
+        e.boxOutline.Color = Color3.fromRGB(0, 0, 0)
+        e.boxOutline.Visible = false
 
-    -- Box outline (black, slightly bigger, for contrast)
-    e.boxOutline = D("Square")
-    e.boxOutline.Filled = false
-    e.boxOutline.Thickness = 3
-    e.boxOutline.Color = Color3.fromRGB(0, 0, 0)
-    e.boxOutline.Visible = false
+        e.fill = D("Square")
+        e.fill.Filled = true
+        e.fill.Transparency = 0.82
+        e.fill.Visible = false
 
-    -- Box fill
-    e.fill = D("Square")
-    e.fill.Filled = true
-    e.fill.Transparency = 0.82
-    e.fill.Visible = false
+        e.corners = {}
+        for i = 1, 8 do
+            local l = D("Line")
+            l.Thickness = 2
+            l.Visible = false
+            e.corners[i] = l
+        end
+        e.cornerOutlines = {}
+        for i = 1, 8 do
+            local l = D("Line")
+            l.Thickness = 4
+            l.Color = Color3.fromRGB(0, 0, 0)
+            l.Visible = false
+            e.cornerOutlines[i] = l
+        end
 
-    -- Corner box lines (8 lines)
-    e.corners = {}
-    for i = 1, 8 do
-        local l = D("Line")
-        l.Thickness = 2
-        l.Visible = false
-        e.corners[i] = l
-    end
-    -- Corner outline (8 more, thicker, black)
-    e.cornerOutlines = {}
-    for i = 1, 8 do
-        local l = D("Line")
-        l.Thickness = 4
-        l.Color = Color3.fromRGB(0, 0, 0)
-        l.Visible = false
-        e.cornerOutlines[i] = l
-    end
+        e.name = D("Text")
+        e.name.Center = true
+        e.name.Outline = true
+        e.name.OutlineColor = Color3.fromRGB(0, 0, 0)
+        e.name.Size = 13
+        e.name.Font = Drawing.Fonts.UI
+        e.name.Visible = false
 
-    -- Name text
-    e.name = D("Text")
-    e.name.Center = true
-    e.name.Outline = true
-    e.name.OutlineColor = Color3.fromRGB(0, 0, 0)
-    e.name.Size = 13
-    e.name.Font = Drawing.Fonts.UI
-    e.name.Visible = false
+        e.nameBG = D("Square")
+        e.nameBG.Filled = true
+        e.nameBG.Color = Color3.fromRGB(0, 0, 0)
+        e.nameBG.Transparency = 0.45
+        e.nameBG.Visible = false
 
-    -- Name background
-    e.nameBG = D("Square")
-    e.nameBG.Filled = true
-    e.nameBG.Color = Color3.fromRGB(0, 0, 0)
-    e.nameBG.Transparency = 0.45
-    e.nameBG.Visible = false
+        e.dist = D("Text")
+        e.dist.Center = true
+        e.dist.Outline = true
+        e.dist.OutlineColor = Color3.fromRGB(0, 0, 0)
+        e.dist.Size = 11
+        e.dist.Font = Drawing.Fonts.UI
+        e.dist.Color = Color3.fromRGB(180, 185, 200)
+        e.dist.Visible = false
 
-    -- Distance text
-    e.dist = D("Text")
-    e.dist.Center = true
-    e.dist.Outline = true
-    e.dist.OutlineColor = Color3.fromRGB(0, 0, 0)
-    e.dist.Size = 11
-    e.dist.Font = Drawing.Fonts.UI
-    e.dist.Color = Color3.fromRGB(180, 185, 200)
-    e.dist.Visible = false
+        e.hpBG = D("Square")
+        e.hpBG.Filled = true
+        e.hpBG.Color = Color3.fromRGB(10, 10, 10)
+        e.hpBG.Visible = false
 
-    -- Health bar background
-    e.hpBG = D("Square")
-    e.hpBG.Filled = true
-    e.hpBG.Color = Color3.fromRGB(10, 10, 10)
-    e.hpBG.Visible = false
+        e.hpOutline = D("Square")
+        e.hpOutline.Filled = false
+        e.hpOutline.Thickness = 1
+        e.hpOutline.Color = Color3.fromRGB(0, 0, 0)
+        e.hpOutline.Visible = false
 
-    -- Health bar outline
-    e.hpOutline = D("Square")
-    e.hpOutline.Filled = false
-    e.hpOutline.Thickness = 1
-    e.hpOutline.Color = Color3.fromRGB(0, 0, 0)
-    e.hpOutline.Visible = false
+        e.hpFill = D("Square")
+        e.hpFill.Filled = true
+        e.hpFill.Visible = false
 
-    -- Health bar fill
-    e.hpFill = D("Square")
-    e.hpFill.Filled = true
-    e.hpFill.Visible = false
+        e.tracer = D("Line")
+        e.tracer.Thickness = 1.2
+        e.tracer.Visible = false
 
-    -- Tracer line
-    e.tracer = D("Line")
-    e.tracer.Thickness = 1.2
-    e.tracer.Visible = false
+        e.headDot = D("Circle")
+        e.headDot.Filled = true
+        e.headDot.Radius = 4
+        e.headDot.Visible = false
 
-    -- Head dot
-    e.headDot = D("Circle")
-    e.headDot.Filled = true
-    e.headDot.Radius = 4
-    e.headDot.Visible = false
+        e.headDotOut = D("Circle")
+        e.headDotOut.Filled = false
+        e.headDotOut.Thickness = 1.5
+        e.headDotOut.Color = Color3.fromRGB(0, 0, 0)
+        e.headDotOut.Radius = 5
+        e.headDotOut.Visible = false
 
-    -- Head dot outline
-    e.headDotOut = D("Circle")
-    e.headDotOut.Filled = false
-    e.headDotOut.Thickness = 1.5
-    e.headDotOut.Color = Color3.fromRGB(0, 0, 0)
-    e.headDotOut.Radius = 5
-    e.headDotOut.Visible = false
+        e.targetDot = D("Circle")
+        e.targetDot.Filled = true
+        e.targetDot.Radius = 6
+        e.targetDot.Color = Color3.fromRGB(0, 255, 180)
+        e.targetDot.Visible = false
 
-    -- Silent aim target dot
-    e.targetDot = D("Circle")
-    e.targetDot.Filled = true
-    e.targetDot.Radius = 6
-    e.targetDot.Color = Color3.fromRGB(0, 255, 180)
-    e.targetDot.Visible = false
+        e.targetDotOut = D("Circle")
+        e.targetDotOut.Filled = false
+        e.targetDotOut.Thickness = 2
+        e.targetDotOut.Color = Color3.fromRGB(0, 0, 0)
+        e.targetDotOut.Radius = 7
+        e.targetDotOut.Visible = false
 
-    e.targetDotOut = D("Circle")
-    e.targetDotOut.Filled = false
-    e.targetDotOut.Thickness = 2
-    e.targetDotOut.Color = Color3.fromRGB(0, 0, 0)
-    e.targetDotOut.Radius = 7
-    e.targetDotOut.Visible = false
+        e.skeleton = {}
+        for i = 1, 14 do
+            local l = D("Line")
+            l.Thickness = 1.5
+            l.Visible = false
+            e.skeleton[i] = l
+        end
 
-    -- Skeleton lines (14 max for R15)
-    e.skeleton = {}
-    for i = 1, 14 do
-        local l = D("Line")
-        l.Thickness = 1.5
-        l.Visible = false
-        e.skeleton[i] = l
+        espPool[player] = e
     end
 
-    espPool[player] = e
-end
-
-local function destroyESPObject(player)
-    local e = espPool[player]
-    if not e then return end
-
-    -- Destroy all drawing objects
-    for key, val in pairs(e) do
-        if type(val) == "table" then
-            for _, obj in ipairs(val) do
-                pcall(function() obj:Remove() end)
+    local function destroyESPObject(player)
+        local e = espPool[player]
+        if not e then return end
+        for key, val in pairs(e) do
+            if type(val) == "table" then
+                for _, obj in ipairs(val) do
+                    pcall(function() obj:Remove() end)
+                end
+            else
+                pcall(function() val:Remove() end)
             end
-        else
-            pcall(function() val:Remove() end)
+        end
+        espPool[player] = nil
+    end
+
+    local function hideAll(e)
+        for key, val in pairs(e) do
+            if type(val) == "table" then
+                for _, obj in ipairs(val) do
+                    obj.Visible = false
+                end
+            else
+                val.Visible = false
+            end
         end
     end
 
-    espPool[player] = nil
-end
+    local function drawCornerBox(e, x, y, w, h, col)
+        local cw = w * 0.22
+        local ch = h * 0.22
+        local data = {
+            {x, y, x+cw, y, x, y, x, y+ch},
+            {x+w, y, x+w-cw, y, x+w, y, x+w, y+ch},
+            {x, y+h, x+cw, y+h, x, y+h, x, y+h-ch},
+            {x+w, y+h, x+w-cw, y+h, x+w, y+h, x+w, y+h-ch},
+        }
+        local idx = 1
+        for _, d in ipairs(data) do
+            e.cornerOutlines[idx].From = Vector2.new(d[1], d[2])
+            e.cornerOutlines[idx].To = Vector2.new(d[3], d[4])
+            e.cornerOutlines[idx].Visible = true
+            e.corners[idx].From = Vector2.new(d[1], d[2])
+            e.corners[idx].To = Vector2.new(d[3], d[4])
+            e.corners[idx].Color = col
+            e.corners[idx].Visible = true
+            idx += 1
 
-local function hideAll(e)
-    for key, val in pairs(e) do
-        if type(val) == "table" then
-            for _, obj in ipairs(val) do
-                obj.Visible = false
-            end
-        else
-            val.Visible = false
+            e.cornerOutlines[idx].From = Vector2.new(d[5], d[6])
+            e.cornerOutlines[idx].To = Vector2.new(d[7], d[8])
+            e.cornerOutlines[idx].Visible = true
+            e.corners[idx].From = Vector2.new(d[5], d[6])
+            e.corners[idx].To = Vector2.new(d[7], d[8])
+            e.corners[idx].Color = col
+            e.corners[idx].Visible = true
+            idx += 1
         end
     end
-end
 
-local function drawCornerBox(e, x, y, w, h, col)
-    local cw = w * 0.22
-    local ch = h * 0.22
-    local data = {
-        -- TL horizontal, TL vertical
-        {x, y, x+cw, y, x, y, x, y+ch},
-        -- TR horizontal, TR vertical
-        {x+w, y, x+w-cw, y, x+w, y, x+w, y+ch},
-        -- BL horizontal, BL vertical
-        {x, y+h, x+cw, y+h, x, y+h, x, y+h-ch},
-        -- BR horizontal, BR vertical
-        {x+w, y+h, x+w-cw, y+h, x+w, y+h, x+w, y+h-ch},
-    }
-    local idx = 1
-    for _, d in ipairs(data) do
-        -- Outline first (behind)
-        e.cornerOutlines[idx].From = Vector2.new(d[1], d[2])
-        e.cornerOutlines[idx].To = Vector2.new(d[3], d[4])
-        e.cornerOutlines[idx].Visible = true
-        e.corners[idx].From = Vector2.new(d[1], d[2])
-        e.corners[idx].To = Vector2.new(d[3], d[4])
-        e.corners[idx].Color = col
-        e.corners[idx].Visible = true
-        idx += 1
-
-        e.cornerOutlines[idx].From = Vector2.new(d[5], d[6])
-        e.cornerOutlines[idx].To = Vector2.new(d[7], d[8])
-        e.cornerOutlines[idx].Visible = true
-        e.corners[idx].From = Vector2.new(d[5], d[6])
-        e.corners[idx].To = Vector2.new(d[7], d[8])
-        e.corners[idx].Color = col
-        e.corners[idx].Visible = true
-        idx += 1
-    end
-end
-
-local function drawSkeleton(e, character, color)
-    -- Determine R15 or R6
-    local isR15 = character:FindFirstChild("UpperTorso") ~= nil
-    local connections = isR15 and SKEL_R15 or SKEL_R6
-
-    for i, conn in ipairs(connections) do
-        local partA = character:FindFirstChild(conn[1])
-        local partB = character:FindFirstChild(conn[2])
-
-        if partA and partB then
-            local spA, onA = Camera:WorldToViewportPoint(partA.Position)
-            local spB, onB = Camera:WorldToViewportPoint(partB.Position)
-
-            if onA and onB then
-                e.skeleton[i].From = Vector2.new(spA.X, spA.Y)
-                e.skeleton[i].To = Vector2.new(spB.X, spB.Y)
-                e.skeleton[i].Color = color
-                e.skeleton[i].Visible = true
+    local function drawSkeleton(e, character, color)
+        local isR15 = character:FindFirstChild("UpperTorso") ~= nil
+        local connections = isR15 and SKEL_R15 or SKEL_R6
+        for i, conn in ipairs(connections) do
+            local partA = character:FindFirstChild(conn[1])
+            local partB = character:FindFirstChild(conn[2])
+            if partA and partB then
+                local spA, onA = Camera:WorldToViewportPoint(partA.Position)
+                local spB, onB = Camera:WorldToViewportPoint(partB.Position)
+                if onA and onB then
+                    e.skeleton[i].From = Vector2.new(spA.X, spA.Y)
+                    e.skeleton[i].To = Vector2.new(spB.X, spB.Y)
+                    e.skeleton[i].Color = color
+                    e.skeleton[i].Visible = true
+                else
+                    e.skeleton[i].Visible = false
+                end
             else
                 e.skeleton[i].Visible = false
             end
-        else
+        end
+        for i = #connections + 1, 14 do
             e.skeleton[i].Visible = false
         end
     end
 
-    -- Hide remaining skeleton lines (R6 uses 5, R15 uses 14)
-    for i = #connections + 1, 14 do
-        e.skeleton[i].Visible = false
-    end
-end
+    local function updateAllESP()
+        for player, e in pairs(espPool) do
+            local ch = player.Character
+            local hm = ch and ch:FindFirstChildOfClass("Humanoid")
+            local root = ch and ch:FindFirstChild("HumanoidRootPart")
+            local head = ch and ch:FindFirstChild("Head")
+            local worldDist = root and (root.Position - Camera.CFrame.Position).Magnitude or 9999
 
-local function updateAllESP()
-    for player, e in pairs(espPool) do
-        local ch = player.Character
-        local hm = ch and ch:FindFirstChildOfClass("Humanoid")
-        local root = ch and ch:FindFirstChild("HumanoidRootPart")
-        local head = ch and ch:FindFirstChild("Head")
-        local worldDist = root and (root.Position - Camera.CFrame.Position).Magnitude or 9999
+            local show = CFG.ESP.On
+                and ch and hm and root and head
+                and hm.Health > 0
+                and worldDist <= CFG.ESP.MaxDist
+                and not (CFG.ESP.Team and sameTeam(player))
 
-        local show = CFG.ESP.On
-            and ch and hm and root and head
-            and hm.Health > 0
-            and worldDist <= CFG.ESP.MaxDist
-            and not (CFG.ESP.Team and sameTeam(player))
-
-        if not show then
-            hideAll(e)
-            continue
-        end
-
-        local rootSP, onScreen = Camera:WorldToViewportPoint(root.Position)
-        local headSP = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-
-        if not onScreen then
-            hideAll(e)
-            continue
-        end
-
-        -- Calculate box dimensions
-        local scale = 1 / rootSP.Z * 380
-        local boxW = scale * 1.15
-        local boxH = scale * 2.8
-        local boxX = rootSP.X - boxW / 2
-        local boxY = headSP.Y - 4
-
-        local col = CFG.ESP.BoxColor
-        local dist = math.floor(worldDist)
-
-        -- ── Box drawing ──
-        if CFG.ESP.Style == "Corner" then
-            e.box.Visible = false
-            e.boxOutline.Visible = false
-            e.fill.Visible = false
-            if CFG.ESP.Boxes then
-                drawCornerBox(e, boxX, boxY, boxW, boxH, col)
-                if CFG.ESP.Fill then
-                    e.fill.Position = Vector2.new(boxX, boxY)
-                    e.fill.Size = Vector2.new(boxW, boxH)
-                    e.fill.Color = col
-                    e.fill.Visible = true
-                end
-            else
-                for i = 1, 8 do e.corners[i].Visible = false; e.cornerOutlines[i].Visible = false end
+            if not show then
+                hideAll(e)
+                continue
             end
-        else
-            -- Normal box
-            for i = 1, 8 do e.corners[i].Visible = false; e.cornerOutlines[i].Visible = false end
-            if CFG.ESP.Boxes then
-                -- Outline (black, behind)
-                e.boxOutline.Position = Vector2.new(boxX - 1, boxY - 1)
-                e.boxOutline.Size = Vector2.new(boxW + 2, boxH + 2)
-                e.boxOutline.Visible = true
 
-                -- Colored box
-                e.box.Position = Vector2.new(boxX, boxY)
-                e.box.Size = Vector2.new(boxW, boxH)
-                e.box.Color = col
-                e.box.Visible = true
+            local rootSP, onScreen = Camera:WorldToViewportPoint(root.Position)
+            local headSP = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
 
-                -- Fill
-                if CFG.ESP.Fill then
-                    e.fill.Position = Vector2.new(boxX, boxY)
-                    e.fill.Size = Vector2.new(boxW, boxH)
-                    e.fill.Color = col
-                    e.fill.Visible = true
-                else
-                    e.fill.Visible = false
-                end
-            else
+            if not onScreen then
+                hideAll(e)
+                continue
+            end
+
+            local scale = 1 / rootSP.Z * 380
+            local boxW = scale * 1.15
+            local boxH = scale * 2.8
+            local boxX = rootSP.X - boxW / 2
+            local boxY = headSP.Y - 4
+
+            local col = CFG.ESP.BoxColor
+            local dist = math.floor(worldDist)
+
+            if CFG.ESP.Style == "Corner" then
                 e.box.Visible = false
                 e.boxOutline.Visible = false
                 e.fill.Visible = false
-            end
-        end
-
-        -- ── Name ──
-        if CFG.ESP.Names then
-            local nameText = player.DisplayName
-            local nameY = boxY - 18
-
-            e.name.Position = Vector2.new(rootSP.X, nameY)
-            e.name.Text = nameText
-            e.name.Color = CFG.ESP.NameColor
-            e.name.Visible = true
-
-            if CFG.ESP.NameBG then
-                local textW = #nameText * 6.5
-                e.nameBG.Position = Vector2.new(rootSP.X - textW/2 - 3, nameY - 2)
-                e.nameBG.Size = Vector2.new(textW + 6, 16)
-                e.nameBG.Visible = true
+                if CFG.ESP.Boxes then
+                    drawCornerBox(e, boxX, boxY, boxW, boxH, col)
+                    if CFG.ESP.Fill then
+                        e.fill.Position = Vector2.new(boxX, boxY)
+                        e.fill.Size = Vector2.new(boxW, boxH)
+                        e.fill.Color = col
+                        e.fill.Visible = true
+                    end
+                else
+                    for i = 1, 8 do e.corners[i].Visible = false; e.cornerOutlines[i].Visible = false end
+                end
             else
+                for i = 1, 8 do e.corners[i].Visible = false; e.cornerOutlines[i].Visible = false end
+                if CFG.ESP.Boxes then
+                    e.boxOutline.Position = Vector2.new(boxX - 1, boxY - 1)
+                    e.boxOutline.Size = Vector2.new(boxW + 2, boxH + 2)
+                    e.boxOutline.Visible = true
+
+                    e.box.Position = Vector2.new(boxX, boxY)
+                    e.box.Size = Vector2.new(boxW, boxH)
+                    e.box.Color = col
+                    e.box.Visible = true
+
+                    if CFG.ESP.Fill then
+                        e.fill.Position = Vector2.new(boxX, boxY)
+                        e.fill.Size = Vector2.new(boxW, boxH)
+                        e.fill.Color = col
+                        e.fill.Visible = true
+                    else
+                        e.fill.Visible = false
+                    end
+                else
+                    e.box.Visible = false
+                    e.boxOutline.Visible = false
+                    e.fill.Visible = false
+                end
+            end
+
+            if CFG.ESP.Names then
+                local nameText = player.DisplayName
+                local nameY = boxY - 18
+                e.name.Position = Vector2.new(rootSP.X, nameY)
+                e.name.Text = nameText
+                e.name.Color = CFG.ESP.NameColor
+                e.name.Visible = true
+                if CFG.ESP.NameBG then
+                    local textW = #nameText * 6.5
+                    e.nameBG.Position = Vector2.new(rootSP.X - textW/2 - 3, nameY - 2)
+                    e.nameBG.Size = Vector2.new(textW + 6, 16)
+                    e.nameBG.Visible = true
+                else
+                    e.nameBG.Visible = false
+                end
+            else
+                e.name.Visible = false
                 e.nameBG.Visible = false
             end
-        else
-            e.name.Visible = false
-            e.nameBG.Visible = false
-        end
 
-        -- ── Distance ──
-        if CFG.ESP.Dist then
-            e.dist.Position = Vector2.new(rootSP.X, boxY + boxH + 3)
-            e.dist.Text = dist .. "m"
-            e.dist.Visible = true
-        else
-            e.dist.Visible = false
-        end
-
-        -- ── Health bar ──
-        if CFG.ESP.Health then
-            local hp = math.clamp(hm.Health / hm.MaxHealth, 0, 1)
-            local barX = boxX - 8
-            local barW = 4
-            local barH = boxH
-
-            -- Background
-            e.hpBG.Position = Vector2.new(barX, boxY)
-            e.hpBG.Size = Vector2.new(barW, barH)
-            e.hpBG.Visible = true
-
-            -- Outline
-            e.hpOutline.Position = Vector2.new(barX - 1, boxY - 1)
-            e.hpOutline.Size = Vector2.new(barW + 2, barH + 2)
-            e.hpOutline.Visible = true
-
-            -- Fill (colored by health)
-            local hpColor = Color3.fromRGB(
-                math.floor(255 * (1 - hp)),
-                math.floor(255 * hp),
-                0
-            )
-            e.hpFill.Position = Vector2.new(barX, boxY + barH * (1 - hp))
-            e.hpFill.Size = Vector2.new(barW, barH * hp)
-            e.hpFill.Color = hpColor
-            e.hpFill.Visible = true
-        else
-            e.hpBG.Visible = false
-            e.hpOutline.Visible = false
-            e.hpFill.Visible = false
-        end
-
-        -- ── Tracer ──
-        if CFG.ESP.Tracers then
-            local origin
-            if CFG.ESP.TracerOrigin == "Top" then
-                origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
-            elseif CFG.ESP.TracerOrigin == "Center" then
-                origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            if CFG.ESP.Dist then
+                e.dist.Position = Vector2.new(rootSP.X, boxY + boxH + 3)
+                e.dist.Text = dist .. "m"
+                e.dist.Visible = true
             else
-                origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                e.dist.Visible = false
             end
-            e.tracer.From = origin
-            e.tracer.To = Vector2.new(rootSP.X, boxY + boxH)
-            e.tracer.Color = CFG.ESP.TracerColor
-            e.tracer.Visible = true
-        else
-            e.tracer.Visible = false
-        end
 
-        -- ── Head dot ──
-        if CFG.ESP.HeadDot then
-            local hsp = Camera:WorldToViewportPoint(head.Position)
-            e.headDot.Position = Vector2.new(hsp.X, hsp.Y)
-            e.headDot.Color = col
-            e.headDot.Visible = true
-            e.headDotOut.Position = Vector2.new(hsp.X, hsp.Y)
-            e.headDotOut.Visible = true
-        else
-            e.headDot.Visible = false
-            e.headDotOut.Visible = false
-        end
+            if CFG.ESP.Health then
+                local hp = math.clamp(hm.Health / hm.MaxHealth, 0, 1)
+                local barX = boxX - 8
+                local barW = 4
+                local barH = boxH
+                e.hpBG.Position = Vector2.new(barX, boxY)
+                e.hpBG.Size = Vector2.new(barW, barH)
+                e.hpBG.Visible = true
+                e.hpOutline.Position = Vector2.new(barX - 1, boxY - 1)
+                e.hpOutline.Size = Vector2.new(barW + 2, barH + 2)
+                e.hpOutline.Visible = true
+                local hpColor = Color3.fromRGB(
+                    math.floor(255 * (1 - hp)),
+                    math.floor(255 * hp),
+                    0
+                )
+                e.hpFill.Position = Vector2.new(barX, boxY + barH * (1 - hp))
+                e.hpFill.Size = Vector2.new(barW, barH * hp)
+                e.hpFill.Color = hpColor
+                e.hpFill.Visible = true
+            else
+                e.hpBG.Visible = false
+                e.hpOutline.Visible = false
+                e.hpFill.Visible = false
+            end
 
-        -- ── Skeleton ──
-        if CFG.ESP.Skeleton then
-            drawSkeleton(e, ch, CFG.ESP.SkeletonColor)
-        else
-            for i = 1, 14 do e.skeleton[i].Visible = false end
-        end
+            if CFG.ESP.Tracers then
+                local origin
+                if CFG.ESP.TracerOrigin == "Top" then
+                    origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
+                elseif CFG.ESP.TracerOrigin == "Center" then
+                    origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                else
+                    origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                end
+                e.tracer.From = origin
+                e.tracer.To = Vector2.new(rootSP.X, boxY + boxH)
+                e.tracer.Color = CFG.ESP.TracerColor
+                e.tracer.Visible = true
+            else
+                e.tracer.Visible = false
+            end
 
-        -- ── Silent aim target dot ──
-        if CFG.SA.On and CFG.SA.Dot and silentTarget == player then
-            local tp = ch:FindFirstChild(CFG.SA.Part)
-            if tp then
-                local tsp = Camera:WorldToViewportPoint(tp.Position)
-                e.targetDot.Position = Vector2.new(tsp.X, tsp.Y)
-                e.targetDot.Visible = true
-                e.targetDotOut.Position = Vector2.new(tsp.X, tsp.Y)
-                e.targetDotOut.Visible = true
+            if CFG.ESP.HeadDot then
+                local hsp = Camera:WorldToViewportPoint(head.Position)
+                e.headDot.Position = Vector2.new(hsp.X, hsp.Y)
+                e.headDot.Color = col
+                e.headDot.Visible = true
+                e.headDotOut.Position = Vector2.new(hsp.X, hsp.Y)
+                e.headDotOut.Visible = true
+            else
+                e.headDot.Visible = false
+                e.headDotOut.Visible = false
+            end
+
+            if CFG.ESP.Skeleton then
+                drawSkeleton(e, ch, CFG.ESP.SkeletonColor)
+            else
+                for i = 1, 14 do e.skeleton[i].Visible = false end
+            end
+
+            if CFG.SA.On and CFG.SA.Dot and silentTarget == player then
+                local tp = ch:FindFirstChild(CFG.SA.Part)
+                if tp then
+                    local tsp = Camera:WorldToViewportPoint(tp.Position)
+                    e.targetDot.Position = Vector2.new(tsp.X, tsp.Y)
+                    e.targetDot.Visible = true
+                    e.targetDotOut.Position = Vector2.new(tsp.X, tsp.Y)
+                    e.targetDotOut.Visible = true
+                else
+                    e.targetDot.Visible = false
+                    e.targetDotOut.Visible = false
+                end
             else
                 e.targetDot.Visible = false
                 e.targetDotOut.Visible = false
             end
-        else
-            e.targetDot.Visible = false
-            e.targetDotOut.Visible = false
         end
     end
-end
 
--- Initialize ESP for all current players
-for _, player in ipairs(Players:GetPlayers()) do
-    createESPObject(player)
-end
+    -- Initialize ESP for current players
+    for _, player in ipairs(Players:GetPlayers()) do
+        createESPObject(player)
+    end
 
--- New players
-Players.PlayerAdded:Connect(function(player)
-    createESPObject(player)
-    player.CharacterAdded:Connect(function(ch)
-        task.wait(0.5)
-        if not espPool[player] then createESPObject(player) end
-        -- Chams on respawn
-        if CFG.ESP.Chams and player ~= LP then
-            local h = Instance.new("Highlight", ch)
-            h.FillColor = Color3.fromRGB(255, 30, 30)
-            h.OutlineColor = Color3.new(1, 1, 1)
-            h.FillTransparency = 0.5
-        end
+    Players.PlayerAdded:Connect(function(player)
+        createESPObject(player)
+        player.CharacterAdded:Connect(function(ch)
+            taskLib.wait(0.5)
+            if not espPool[player] then createESPObject(player) end
+            if CFG.ESP.Chams and player ~= LP then
+                local h = Instance.new("Highlight", ch)
+                h.FillColor = Color3.fromRGB(255, 30, 30)
+                h.OutlineColor = Color3.new(1, 1, 1)
+                h.FillTransparency = 0.5
+            end
+        end)
     end)
-end)
 
--- Player leaving
-Players.PlayerRemoving:Connect(destroyESPObject)
+    Players.PlayerRemoving:Connect(destroyESPObject)
 
--- Handle respawns for existing players
-for _, player in ipairs(Players:GetPlayers()) do
-    player.CharacterAdded:Connect(function(ch)
-        task.wait(0.5)
-        if not espPool[player] then createESPObject(player) end
-        if CFG.ESP.Chams and player ~= LP then
-            local h = Instance.new("Highlight", ch)
-            h.FillColor = Color3.fromRGB(255, 30, 30)
-            h.OutlineColor = Color3.new(1, 1, 1)
-            h.FillTransparency = 0.5
-        end
-    end)
+    for _, player in ipairs(Players:GetPlayers()) do
+        player.CharacterAdded:Connect(function(ch)
+            taskLib.wait(0.5)
+            if not espPool[player] then createESPObject(player) end
+            if CFG.ESP.Chams and player ~= LP then
+                local h = Instance.new("Highlight", ch)
+                h.FillColor = Color3.fromRGB(255, 30, 30)
+                h.OutlineColor = Color3.new(1, 1, 1)
+                h.FillTransparency = 0.5
+            end
+        end)
+    end
+else
+    -- No drawing – disable ESP entirely
+    function updateAllESP() end
+    warn("Drawing library not available – ESP disabled")
 end
 
----------------------------------------------------------------
--- SECTION 17: AIMBOT ENGINE
----------------------------------------------------------------
-local fovCircle = Drawing.new("Circle")
-fovCircle.Visible = false
-fovCircle.Filled = false
-fovCircle.Thickness = 1.5
-fovCircle.NumSides = 80
-fovCircle.Color = Color3.fromRGB(200, 205, 255)
-fovCircle.Transparency = 0.7
+-- ========== AIMBOT ENGINE ==========
+local fovCircle, fovOutline, saFOV = nil, nil, nil
+if drawingSupported then
+    fovCircle = Drawing.new("Circle")
+    fovCircle.Visible = false
+    fovCircle.Filled = false
+    fovCircle.Thickness = 1.5
+    fovCircle.NumSides = 80
+    fovCircle.Color = Color3.fromRGB(200, 205, 255)
+    fovCircle.Transparency = 0.7
 
-local fovOutline = Drawing.new("Circle")
-fovOutline.Visible = false
-fovOutline.Filled = false
-fovOutline.Thickness = 3
-fovOutline.NumSides = 80
-fovOutline.Color = Color3.fromRGB(0, 0, 0)
-fovOutline.Transparency = 0.5
+    fovOutline = Drawing.new("Circle")
+    fovOutline.Visible = false
+    fovOutline.Filled = false
+    fovOutline.Thickness = 3
+    fovOutline.NumSides = 80
+    fovOutline.Color = Color3.fromRGB(0, 0, 0)
+    fovOutline.Transparency = 0.5
 
--- Key checking
+    saFOV = Drawing.new("Circle")
+    saFOV.Visible = false
+    saFOV.Filled = false
+    saFOV.Thickness = 1
+    saFOV.NumSides = 60
+    saFOV.Color = Color3.fromRGB(255, 180, 0)
+    saFOV.Transparency = 0.6
+else
+    fovCircle = { Visible = false }
+    fovOutline = { Visible = false }
+    saFOV = { Visible = false }
+end
+
 local aimKeyCheckers = {
     RMB = function() return UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) end,
     LMB = function() return UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) end,
@@ -2087,15 +1995,12 @@ local function doAimbot(targetPos, instant)
     local dy = (screenPos.Y - cy) * CFG.Aim.Sens
 
     if instant then
-        -- Ragebot: full distance in one frame
         if EXEC.mmr then
             pcall(EXEC.mmr, dx, dy)
         else
-            -- Fallback: direct camera set
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
         end
     else
-        -- Smooth aim: move a fraction
         local smooth = CFG.Aim.Smooth / 100
         if EXEC.mmr then
             pcall(EXEC.mmr, dx * smooth, dy * smooth)
@@ -2108,16 +2013,13 @@ local function doAimbot(targetPos, instant)
     end
 end
 
----------------------------------------------------------------
--- SECTION 18: SILENT AIM — TRIPLE HOOK
----------------------------------------------------------------
+-- ========== SILENT AIM HOOKS ==========
 local hookStatus = {
     mouseHit = false,
     raycast = false,
     fireServer = false,
 }
 
--- Shared target finder for silent aim
 local function getSilentTarget()
     if not CFG.SA.On and not CFG.Rage.On then
         silentTarget = nil
@@ -2132,7 +2034,7 @@ local function getSilentTarget()
         CFG.SA.FOVCheck and CFG.SA.FOV or nil,
         CFG.SA.Part,
         CFG.SA.Team,
-        false, -- no vis check (silent aim shoots through walls)
+        false,
         CFG.Rage.On and CFG.Rage.Priority or "Closest"
     )
 
@@ -2147,7 +2049,6 @@ local function getSilentTarget()
     return target, part
 end
 
--- Deep replacement of arguments (handles nested tables)
 local function deepReplace(args, targetPart)
     for i, v in ipairs(args) do
         if typeof(v) == "Vector3" then
@@ -2168,7 +2069,6 @@ local function deepReplace(args, targetPart)
                 end
             end
         elseif type(v) == "table" then
-            -- Scan one level deep
             for k2, v2 in pairs(v) do
                 if typeof(v2) == "Vector3" then
                     v[k2] = targetPart.Position
@@ -2181,7 +2081,6 @@ local function deepReplace(args, targetPart)
                         v[k2] = targetPart
                     end
                 elseif type(v2) == "table" then
-                    -- Scan two levels deep
                     for k3, v3 in pairs(v2) do
                         if typeof(v3) == "Vector3" then
                             v2[k3] = targetPart.Position
@@ -2194,7 +2093,6 @@ local function deepReplace(args, targetPart)
                                 v2[k3] = targetPart
                             end
                         elseif type(v3) == "table" then
-                            -- Three levels deep
                             for k4, v4 in pairs(v3) do
                                 if typeof(v4) == "Vector3" then
                                     v3[k4] = targetPart.Position
@@ -2211,29 +2109,24 @@ local function deepReplace(args, targetPart)
     return args
 end
 
--- ─── HOOK 1: __index (Mouse.Hit, Mouse.Target, Mouse.UnitRay) ────
+-- Hook installation with safe checks
 if EXEC.grm and EXEC.sro and EXEC.ncc then
     pcall(function()
         local mt = EXEC.grm(game)
         local oldIndex = mt.__index
-
         EXEC.sro(mt, false)
         mt.__index = wrapCC(function(self, key)
-            -- Only intercept game code, not our code
             local isSelf = false
             if EXEC.cc then
                 isSelf = EXEC.cc()
             else
                 isSelf = _selfCall
             end
-
             if not isSelf and (CFG.SA.On or CFG.Rage.On) then
-                -- Check if this is a Mouse object
                 local isMouseObj = false
                 pcall(function()
-                    isMouseObj = (self == Mouse) or (tostring(self) == "Mouse") or self:IsA("Mouse") or self:IsA("PlayerMouse")
+                    isMouseObj = (self == Mouse) or (tostring(self) == "Mouse") or (self:IsA and self:IsA("Mouse")) or (self:IsA and self:IsA("PlayerMouse"))
                 end)
-
                 if isMouseObj then
                     local _, part = getSilentTarget()
                     if part then
@@ -2255,7 +2148,6 @@ if EXEC.grm and EXEC.sro and EXEC.ncc then
                     end
                 end
             end
-
             return oldIndex(self, key)
         end)
         EXEC.sro(mt, true)
@@ -2263,23 +2155,17 @@ if EXEC.grm and EXEC.sro and EXEC.ncc then
     end)
 end
 
--- ─── HOOK 2 & 3: __namecall (Raycast + FireServer) ────
 if EXEC.grm and EXEC.sro and EXEC.ncc and EXEC.gnm then
     pcall(function()
         local mt = EXEC.grm(game)
         local oldNamecall = mt.__namecall
-
         EXEC.sro(mt, false)
         mt.__namecall = wrapCC(function(self, ...)
             local method = EXEC.gnm()
             local args = {...}
-
             local isSelf = false
             if EXEC.cc then isSelf = EXEC.cc() else isSelf = _selfCall end
-
             if not isSelf and (CFG.SA.On or CFG.Rage.On) then
-
-                -- HOOK 2: workspace:Raycast() — redirect the ray direction
                 if method == "Raycast" and self == workspace then
                     local _, part = getSilentTarget()
                     if part and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
@@ -2289,8 +2175,6 @@ if EXEC.grm and EXEC.sro and EXEC.ncc and EXEC.gnm then
                         return oldNamecall(self, origin, newDir, select(3, ...))
                     end
                 end
-
-                -- HOOK 3: RemoteEvent:FireServer() / RemoteFunction:InvokeServer()
                 if method == "FireServer" or method == "InvokeServer" then
                     local _, part = getSilentTarget()
                     if part then
@@ -2300,14 +2184,12 @@ if EXEC.grm and EXEC.sro and EXEC.ncc and EXEC.gnm then
                     end
                 end
             end
-
             return oldNamecall(self, ...)
         end)
         EXEC.sro(mt, true)
     end)
 end
 
--- ─── FALLBACK: hookfunction on FireServer if __namecall failed ────
 if not hookStatus.fireServer and EXEC.hkf and EXEC.ncc then
     pcall(function()
         local oldFS
@@ -2329,19 +2211,7 @@ if not hookStatus.fireServer and EXEC.hkf and EXEC.ncc then
     end)
 end
 
--- Update status tab with hook results
-task.defer(function()
-    task.wait(1)
-    local hookInfo = "Mouse.Hit hook: " .. (hookStatus.mouseHit and "OK" or "FAIL")
-        .. "  |  Raycast hook: READY"
-        .. "  |  FireServer hook: READY"
-    InfoBox(tStatus, hookInfo, 32)
-end)
-
----------------------------------------------------------------
--- SECTION 19: ONE-TIME EVENT CONNECTIONS
----------------------------------------------------------------
--- Infinite jump (NOT inside RenderStepped)
+-- ========== ONE-TIME EVENT CONNECTIONS ==========
 UIS.JumpRequest:Connect(function()
     if CFG.Misc.InfJump then
         local ch = LP.Character
@@ -2352,122 +2222,106 @@ UIS.JumpRequest:Connect(function()
     end
 end)
 
--- Anti-AFK
 LP.Idled:Connect(function()
     if CFG.Misc.AntiAFK then
         pcall(function()
             local vu = game:GetService("VirtualUser")
             vu:Button2Down(Vector2.new(0, 0), Camera.CFrame)
-            task.wait(0.1)
+            taskLib.wait(0.1)
             vu:Button2Up(Vector2.new(0, 0), Camera.CFrame)
         end)
     end
 end)
 
--- Camera update (keep reference current)
 RunService.RenderStepped:Connect(function()
     Camera = workspace.CurrentCamera
 end)
 
----------------------------------------------------------------
--- SECTION 20: HUD OVERLAY
----------------------------------------------------------------
-local watermark = Drawing.new("Text")
-watermark.Text = "RscriptsX v5.0"
-watermark.Size = 14
-watermark.Font = Drawing.Fonts.UI
-watermark.Color = Color3.fromRGB(200, 200, 220)
-watermark.Outline = true
-watermark.OutlineColor = Color3.fromRGB(0, 0, 0)
-watermark.Position = Vector2.new(10, 6)
-watermark.Visible = true
+-- ========== HUD OVERLAY ==========
+local watermark, targetInfo = nil, nil
+if drawingSupported then
+    watermark = Drawing.new("Text")
+    watermark.Text = "RscriptsX v5.0"
+    watermark.Size = 14
+    watermark.Font = Drawing.Fonts.UI
+    watermark.Color = Color3.fromRGB(200, 200, 220)
+    watermark.Outline = true
+    watermark.OutlineColor = Color3.fromRGB(0, 0, 0)
+    watermark.Position = Vector2.new(10, 6)
+    watermark.Visible = true
 
-local targetInfo = Drawing.new("Text")
-targetInfo.Text = ""
-targetInfo.Size = 12
-targetInfo.Font = Drawing.Fonts.UI
-targetInfo.Color = Color3.fromRGB(0, 220, 200)
-targetInfo.Outline = true
-targetInfo.OutlineColor = Color3.fromRGB(0, 0, 0)
-targetInfo.Position = Vector2.new(10, 24)
-targetInfo.Visible = true
+    targetInfo = Drawing.new("Text")
+    targetInfo.Text = ""
+    targetInfo.Size = 12
+    targetInfo.Font = Drawing.Fonts.UI
+    targetInfo.Color = Color3.fromRGB(0, 220, 200)
+    targetInfo.Outline = true
+    targetInfo.OutlineColor = Color3.fromRGB(0, 0, 0)
+    targetInfo.Position = Vector2.new(10, 24)
+    targetInfo.Visible = true
+else
+    watermark = { Visible = false }
+    targetInfo = { Visible = false }
+end
 
--- Silent aim FOV circle
-local saFOV = Drawing.new("Circle")
-saFOV.Visible = false
-saFOV.Filled = false
-saFOV.Thickness = 1
-saFOV.NumSides = 60
-saFOV.Color = Color3.fromRGB(255, 180, 0)
-saFOV.Transparency = 0.6
-
----------------------------------------------------------------
--- SECTION 21: MAIN RENDER LOOP
----------------------------------------------------------------
+-- ========== MAIN RENDER LOOP ==========
 RunService.RenderStepped:Connect(function()
     local vp = Camera.ViewportSize
     local cx = vp.X / 2
     local cy = vp.Y / 2
 
-    -- ── FOV Circles ──
-    fovOutline.Position = Vector2.new(cx, cy)
-    fovOutline.Radius = CFG.Aim.FOV + 1
-    fovOutline.Visible = CFG.Aim.Circle and (CFG.Aim.On or CFG.Rage.On)
+    if drawingSupported then
+        fovOutline.Position = Vector2.new(cx, cy)
+        fovOutline.Radius = CFG.Aim.FOV + 1
+        fovOutline.Visible = CFG.Aim.Circle and (CFG.Aim.On or CFG.Rage.On)
 
-    fovCircle.Position = Vector2.new(cx, cy)
-    fovCircle.Radius = CFG.Aim.FOV
-    fovCircle.Visible = CFG.Aim.Circle and (CFG.Aim.On or CFG.Rage.On)
+        fovCircle.Position = Vector2.new(cx, cy)
+        fovCircle.Radius = CFG.Aim.FOV
+        fovCircle.Visible = CFG.Aim.Circle and (CFG.Aim.On or CFG.Rage.On)
 
-    -- SA FOV circle
-    saFOV.Position = Vector2.new(cx, cy)
-    saFOV.Radius = CFG.SA.FOV
-    saFOV.Visible = CFG.SA.On and CFG.SA.FOVCheck
+        saFOV.Position = Vector2.new(cx, cy)
+        saFOV.Radius = CFG.SA.FOV
+        saFOV.Visible = CFG.SA.On and CFG.SA.FOVCheck
+    end
 
-    -- ── Update ESP ──
-    updateAllESP()
+    if drawingSupported then
+        updateAllESP()
+    end
 
-    -- ── RAGEBOT (overrides regular aimbot) ──
     if CFG.Rage.On then
         local target = getClosest(
-            nil, -- no FOV limit
+            nil,
             "Head",
             CFG.Aim.Team,
-            false, -- ignore visibility
+            false,
             CFG.Rage.Priority
         )
-
         if target then
             local ch = target.Character
             local part = ch and ch:FindFirstChild("Head")
-
             if part then
                 local root = ch:FindFirstChild("HumanoidRootPart")
                 local vel = root and root.Velocity or Vector3.zero
                 local predicted = part.Position + vel * (CFG.Aim.Pred / 100)
-
-                -- Instant snap
                 doAimbot(predicted, true)
-
-                -- Auto-fire
                 if CFG.Rage.AutoFire then
                     if EXEC.m1c then
                         pcall(EXEC.m1c)
                     elseif EXEC.m1p and EXEC.m1r then
                         pcall(EXEC.m1p)
-                        task.defer(function() pcall(EXEC.m1r) end)
+                        taskLib.defer(function() pcall(EXEC.m1r) end)
                     end
                 end
-
-                -- Update footer
                 footerTarget.Text = "Target: " .. target.DisplayName
-                targetInfo.Text = "RAGE >> " .. target.DisplayName
+                if drawingSupported and targetInfo then
+                    targetInfo.Text = "RAGE >> " .. target.DisplayName
+                end
             end
         else
             footerTarget.Text = "Target: None"
-            targetInfo.Text = ""
+            if drawingSupported and targetInfo then targetInfo.Text = "" end
         end
 
-        -- Anti-aim (desync character rotation)
         if CFG.Rage.AntiAim then
             local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
             if myRoot then
@@ -2478,7 +2332,6 @@ RunService.RenderStepped:Connect(function()
             end
         end
 
-    -- ── REGULAR AIMBOT ──
     elseif CFG.Aim.On and isAimKeyHeld() then
         local target = getClosest(
             CFG.Aim.FOV,
@@ -2487,33 +2340,30 @@ RunService.RenderStepped:Connect(function()
             CFG.Aim.VisCheck,
             "Closest"
         )
-
         if target then
             local ch = target.Character
             local part = ch and ch:FindFirstChild(CFG.Aim.Part)
-
             if part then
                 local root = ch:FindFirstChild("HumanoidRootPart")
                 local vel = root and root.Velocity or Vector3.zero
                 local predicted = part.Position + vel * (CFG.Aim.Pred / 100)
-
                 doAimbot(predicted, false)
-
                 footerTarget.Text = "Target: " .. target.DisplayName
-                targetInfo.Text = "AIM >> " .. target.DisplayName
+                if drawingSupported and targetInfo then
+                    targetInfo.Text = "AIM >> " .. target.DisplayName
+                end
             end
         else
             footerTarget.Text = "Target: None"
-            targetInfo.Text = ""
+            if drawingSupported and targetInfo then targetInfo.Text = "" end
         end
     else
         if not CFG.Rage.On then
             footerTarget.Text = "Target: None"
-            targetInfo.Text = ""
+            if drawingSupported and targetInfo then targetInfo.Text = "" end
         end
     end
 
-    -- ── Fly ──
     if CFG.Misc.Fly and flyBV and flyBG then
         local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
         if root then
@@ -2530,7 +2380,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ── Noclip ──
     if CFG.Misc.Noclip then
         local ch = LP.Character
         if ch then
@@ -2543,9 +2392,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
----------------------------------------------------------------
--- SECTION 22: TOGGLE GUI VISIBILITY (RightShift)
----------------------------------------------------------------
+-- ========== TOGGLE GUI VISIBILITY ==========
 local guiVisible = true
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
@@ -2555,14 +2402,12 @@ UIS.InputBegan:Connect(function(input, processed)
     end
 end)
 
----------------------------------------------------------------
--- SECTION 23: STARTUP NOTIFICATIONS
----------------------------------------------------------------
-task.delay(0.3, function()
+-- ========== STARTUP NOTIFICATIONS ==========
+taskLib.delay(0.3, function()
     Notify("RscriptsX v5.0", "Loaded successfully — key authenticated", 4, TH.green)
 end)
 
-task.delay(1, function()
+taskLib.delay(1, function()
     if EXEC.mmr then
         Notify("Aimbot", "mousemoverel ready — accurate input sim", 3, TH.green)
     else
@@ -2570,12 +2415,11 @@ task.delay(1, function()
     end
 end)
 
-task.delay(1.5, function()
+taskLib.delay(1.5, function()
     local hookCount = 0
     if hookStatus.mouseHit then hookCount += 1 end
-    hookCount += 1 -- raycast is always attempted
-    hookCount += 1 -- fireserver is always attempted
-
+    hookCount += 1
+    hookCount += 1
     if hookStatus.mouseHit then
         Notify("Silent Aim", "TRIPLE HOOK installed (Mouse + Ray + Fire)", 4, TH.green)
     elseif EXEC.grm then
@@ -2587,36 +2431,30 @@ task.delay(1.5, function()
     end
 end)
 
-task.delay(2, function()
+taskLib.delay(2, function()
     Notify("Controls", "RightShift to toggle GUI", 3, TH.accent)
 end)
 
----------------------------------------------------------------
--- SECTION 24: CLEANUP ON DESTROY
----------------------------------------------------------------
+-- ========== CLEANUP ON DESTROY ==========
 GUI.Destroying:Connect(function()
-    -- Clean up all drawing objects
-    for _, e in pairs(espPool) do
-        for key, val in pairs(e) do
-            if type(val) == "table" then
-                for _, obj in ipairs(val) do pcall(function() obj:Remove() end) end
-            else
-                pcall(function() val:Remove() end)
+    if drawingSupported then
+        for _, e in pairs(espPool) do
+            for key, val in pairs(e) do
+                if type(val) == "table" then
+                    for _, obj in ipairs(val) do pcall(function() obj:Remove() end) end
+                else
+                    pcall(function() val:Remove() end)
+                end
             end
         end
+        pcall(function() if fovCircle then fovCircle:Remove() end end)
+        pcall(function() if fovOutline then fovOutline:Remove() end end)
+        pcall(function() if saFOV then saFOV:Remove() end end)
+        pcall(function() if watermark then watermark:Remove() end end)
+        pcall(function() if targetInfo then targetInfo:Remove() end end)
     end
-
-    pcall(function() fovCircle:Remove() end)
-    pcall(function() fovOutline:Remove() end)
-    pcall(function() saFOV:Remove() end)
-    pcall(function() watermark:Remove() end)
-    pcall(function() targetInfo:Remove() end)
-
-    -- Restore wallbang
     disableWB()
-
-    -- Restore fly
     disableFly()
 end)
 
--- End of RscriptsX v5.0
+-- End of RscriptsX v5.0 (Xeno compatible)
